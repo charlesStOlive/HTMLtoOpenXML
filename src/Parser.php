@@ -14,7 +14,8 @@ class Parser
     private $_rStyle = null;
     private $_nestedListRegex = '/<li>(?>[^<]+|(<[uo]l)>|<(?!\/?li)[^>]*>|(?R))*<\/li>(?(1)|(*F))/imx';
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->_cleaner = new Scripts\HTMLCleaner;
         $this->_processProperties = new Scripts\ProcessProperties;
     }
@@ -28,7 +29,8 @@ class Parser
      *
      * @return string The converted string.
      */
-    public function fromHTML($html, $wrapContent = true, $styles = []) {
+    public function fromHTML($html, $wrapContent = true, $styles = [])
+    {
         $this->_openXml = $html;
 
         $this->_setStyles($styles);
@@ -58,7 +60,8 @@ class Parser
      *                      options, than can contain the XML that goes inside
      *                      of the respective pPr and rPr tags
      */
-    private function _setStyles($styles) {
+    private function _setStyles($styles)
+    {
         $this->_rStyle = array_key_exists('run', $styles) ? $styles['run'] : '';
 
         $this->_pStyle = array_key_exists('paragraph', $styles) ? $styles['paragraph'] : '';
@@ -68,7 +71,8 @@ class Parser
     /**
      * Remove empty blocks of XML from the end of the final output
      */
-    private function _removeEndSpaces() {
+    private function _removeEndSpaces()
+    {
 
         $openP = $this->_openP(true);
         $openP = preg_replace('/\//', '\/', $openP);
@@ -86,7 +90,8 @@ class Parser
     /**
      * Remove empty blocks of XML from the start of the final output
      */
-    private function _removeStartSpaces() {
+    private function _removeStartSpaces()
+    {
         $regex = sprintf('/^%s%s/', $this->_openP(), $this->_regexCloseP());
         if (preg_match($regex, $this->_openXml)) {
             $this->_openXml = preg_replace($regex, '', $this->_openXml);
@@ -95,7 +100,8 @@ class Parser
         }
     }
 
-    private function _getOpenXML() {
+    private function _getOpenXML()
+    {
         $this->_openXml = $this->_openP() . $this->_openXml . $this->_closeP();
     }
 
@@ -106,7 +112,8 @@ class Parser
      *
      * @return string
      */
-    private function _preProcessNestedLists($html) {
+    private function _preProcessNestedLists($html)
+    {
 
         $this->_listLevel += 1;
 
@@ -117,12 +124,14 @@ class Parser
         return $html;
     }
 
-
-    public function preProcessNestedList($html) {
+    public function preProcessNestedList($html)
+    {
 
         preg_match('/^<li>(.*?)<(ol|ul)>(.*?)<\/\2><\/li>$/', $html[0], $match);
 
-        $htmlInner = $match[3];
+        trace_log($match[3] ?? $html[0]);
+
+        $htmlInner = $match[3] ?? 'error';
 
         $hasNest = preg_match($this->_nestedListRegex, $htmlInner);
         if ($hasNest) {
@@ -130,7 +139,7 @@ class Parser
         }
 
         $output = '';
-        if ($match[1]) {
+        if ($match[1] ?? false) {
             $output = sprintf('<li>%s</li>', $match[1]);
         }
         $output .= $this->processList($htmlInner);
@@ -138,7 +147,8 @@ class Parser
         return $output;
     }
 
-    private function _processListStyle() {
+    private function _processListStyle()
+    {
 
         $this->_openXml = preg_replace("/\n/", ' ', $this->_openXml);
 
@@ -148,7 +158,8 @@ class Parser
 
     }
 
-    public function processList($html) {
+    public function processList($html)
+    {
         $html = is_array($html) ? $html[2] : $html;
 
         $output = '';
@@ -168,16 +179,18 @@ class Parser
         return $output;
     }
 
-    public function processListItem($html) {
+    public function processListItem($html)
+    {
 
         $html = sprintf('</w:t></w:r></w:p><w:p><w:pPr>%5$s<w:pStyle w:val=\'ListParagraph\'/><w:numPr><w:ilvl w:val=\'%1$d\'/><w:numId w:val=\'%2$d\'/></w:numPr>%3$s</w:pPr><w:r>%3$s<w:t xml:space=\'preserve\'>%4$s',
-                $this->_listLevel, $this->_listIndex, $this->_getStyle('r'), trim($html[1]),
-                $this->_getStyle('p', false));
+            $this->_listLevel, $this->_listIndex, $this->_getStyle('r'), trim($html[1]),
+            $this->_getStyle('p', false));
 
         return $html;
     }
 
-    private function _processBreaks() {
+    private function _processBreaks()
+    {
         $this->_openXml = preg_replace("/(<\/p>)/mi", $this->_closeAndOpenP(true), $this->_openXml);
         $this->_openXml = preg_replace("/(<br\s?\/?>)/mi", $this->_closeAndOpenP(true), $this->_openXml);
 
@@ -190,7 +203,8 @@ class Parser
      *
      * @return null|string|string[]
      */
-    public function minifyHtml($html) {
+    public function minifyHtml($html)
+    {
         $re = '%# Collapse whitespace everywhere but in blacklisted elements.
         (?>             # Match all whitespans other than single space.
           [^\S ]\s*     # Either one [\t\r\n\f\v] and zero or more ws,
@@ -214,7 +228,8 @@ class Parser
         return preg_replace($re, "", $html);
     }
 
-    private function _processSpaces() {
+    private function _processSpaces()
+    {
         $this->_openXml = preg_replace("/(&nbsp;)/mi", " ", $this->_openXml);
         $this->_openXml = preg_replace("/(<w:t>)/mi", "<w:t xml:space='preserve'>", $this->_openXml);
 
@@ -226,7 +241,8 @@ class Parser
      * &lt; and &gt; need to be processed seprately because otherwise they're
      * parsed as < and >, which will break the XML
      */
-    private function _preProcessLtGt() {
+    private function _preProcessLtGt()
+    {
         $this->_openXml = preg_replace('/\&(lt|gt);/im', '\$\$$1;', $this->_openXml);
         // Just in case also check for &amp;lt;
         $this->_openXml = preg_replace('/\&amp;(lt|gt);/im', '\$\$$1;', $this->_openXml);
@@ -236,12 +252,14 @@ class Parser
     /**
      * Reset the values again
      */
-    private function _postProcessLtGt() {
+    private function _postProcessLtGt()
+    {
         $this->_openXml = preg_replace('/\$\$(lt|gt);/', '&$1;', $this->_openXml);
 
     }
 
-    private function _closeAndOpenP($addStyling = false) {
+    private function _closeAndOpenP($addStyling = false)
+    {
         return $this->_closeP() . $this->_openP($addStyling);
     }
 
@@ -252,7 +270,8 @@ class Parser
      *
      * @return string
      */
-    private function _openP($addStyling = false) {
+    private function _openP($addStyling = false)
+    {
         $xml = '<w:p>%s<w:r>%s<w:t>';
         $pStyle = '';
         $rStyle = '';
@@ -271,11 +290,13 @@ class Parser
      * Returns a string that closes a paragraph with run and text
      * @return string
      */
-    private function _closeP() {
+    private function _closeP()
+    {
         return '</w:t></w:r></w:p>';
     }
 
-    private function _regexCloseP() {
+    private function _regexCloseP()
+    {
         return str_replace('/', '\/', $this->_closeP());
     }
 
@@ -286,9 +307,10 @@ class Parser
      *
      * @return null|string
      */
-    private function _getStyle($type, $wrap = true) {
+    private function _getStyle($type, $wrap = true)
+    {
         $field = sprintf('_%sStyle', $type);
-        if ( ! $wrap) {
+        if (!$wrap) {
             return $this->{$field};
         }
 
